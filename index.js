@@ -33,22 +33,18 @@ class EufyPlatform {
   async connect() {
     this.eufyClient = await EufySecurity.initialize(this.config);
 
-    this.connectEventHandlers();
+    this.connectLoginHandlers();
 
     try {
       await this.eufyClient.connect();
-      this.log('EufyClient connected ' + this.eufyClient.isConnected(), true);
+      this.log('EufyClient connected ' + this.eufyClient.isConnected());
     } catch (err) {
       this.log('Error authenticating Eufy : ' + err, true);
     }
 
     if (!this.eufyClient.isConnected()) {
       this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
-      return;
     }
-
-    await this.refreshData(this.eufyClient);
-    await this.updateDevices();
   }
 
   async refreshData(client) {
@@ -70,6 +66,20 @@ class EufyPlatform {
         }
       }, 10 * 60 * 1000);
     }
+  }
+
+  connectLoginHandlers() {
+    this.eufyClient.on('tfa request', () => this.onTFARequest());
+    this.eufyClient.on('captcha request', (id, captcha) => this.onCaptchaRequest(id, captcha));
+    this.eufyClient.on('connect', async () => {
+      this.log('Event: connect', true)
+      this.connectEventHandlers();
+
+      await this.refreshData(this.eufyClient);
+      await this.updateDevices();
+
+      this.actionMainMenu();
+    });
   }
 
   connectEventHandlers() {
@@ -105,10 +115,7 @@ class EufyPlatform {
     this.eufyClient.on('push connect', () => this.log('Event: push connect'));
     this.eufyClient.on('push close', () => this.log('Event: push close'));
     this.eufyClient.on('push message', (message) => this.log('Event: push message: ' + JSON.stringify(message)));
-    this.eufyClient.on('connect', () => this.log('Event: connect'));
     this.eufyClient.on('close', () => this.log('Event: close'));
-    this.eufyClient.on('tfa request', () => this.onTFARequest.bind(this));
-    this.eufyClient.on('captcha request', (id, captcha) => this.onCaptchaRequest.bind(this));
     this.eufyClient.on('cloud livestream start', (station, device, url) => this.log('Event: Station ' + station.getName() + ' cloud livestream start from ' + device.getName() + ' - url: ' + url));
     this.eufyClient.on('cloud livestream stop', (station, device) => this.log('Event: Station ' + station.getName() + ' cloud livestream stop from ' + device.getName()));
     this.eufyClient.on('mqtt connect', () => this.log('Event: mqtt connect'));
@@ -132,9 +139,6 @@ class EufyPlatform {
         this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
         return;
       }
-  
-      await this.refreshData(this.eufyClient);
-      await this.updateDevices();
     });
   }
 
@@ -158,9 +162,6 @@ class EufyPlatform {
         this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
         return;
       }
-  
-      await this.refreshData(this.eufyClient);
-      await this.updateDevices();
     });
   }
 
@@ -488,7 +489,6 @@ class EufyPlatform {
 async function main_loop() {
   const platform = new EufyPlatform(config);
   await platform.connect();
-  platform.actionMainMenu();
 };
 
 main_loop();
