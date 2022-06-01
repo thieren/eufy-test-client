@@ -32,19 +32,20 @@ class EufyPlatform {
 
   async connect() {
     this.eufyClient = await EufySecurity.initialize(this.config);
+
+    this.connectEventHandlers();
+
     try {
       await this.eufyClient.connect();
-      this.log('EufyClient connected ' + this.eufyClient.isConnected());
+      this.log('EufyClient connected ' + this.eufyClient.isConnected(), true);
     } catch (err) {
-      this.log('Error authenticating Eufy : ', err);
+      this.log('Error authenticating Eufy : ' + err, true);
     }
 
     if (!this.eufyClient.isConnected()) {
-      this.log('Not connected can\'t continue! Maybe wrong credentials.', true);
+      this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
       return;
     }
-
-    this.connectEventHandlers();
 
     await this.refreshData(this.eufyClient);
     await this.updateDevices();
@@ -106,14 +107,61 @@ class EufyPlatform {
     this.eufyClient.on('push message', (message) => this.log('Event: push message: ' + JSON.stringify(message)));
     this.eufyClient.on('connect', () => this.log('Event: connect'));
     this.eufyClient.on('close', () => this.log('Event: close'));
-    this.eufyClient.on('tfa request', () => this.log('Event: 2FA request'));
-    this.eufyClient.on('captcha request', () => this.log('Event: captcha request'));
+    this.eufyClient.on('tfa request', () => this.onTFARequest.bind(this));
+    this.eufyClient.on('captcha request', (id, captcha) => this.onCaptchaRequest.bind(this));
     this.eufyClient.on('cloud livestream start', (station, device, url) => this.log('Event: Station ' + station.getName() + ' cloud livestream start from ' + device.getName() + ' - url: ' + url));
     this.eufyClient.on('cloud livestream stop', (station, device) => this.log('Event: Station ' + station.getName() + ' cloud livestream stop from ' + device.getName()));
     this.eufyClient.on('mqtt connect', () => this.log('Event: mqtt connect'));
     this.eufyClient.on('mqtt close', () => this.log('Event: mqtt close'));
     this.eufyClient.on('mqtt lock message', (message) => this.log('Event: mqtt message: ' + JSON.stringify(message)));
+  }
 
+  onTFARequest() {
+    this.log('Event: 2FA request');
+    readline.question('You should have gotten a OTP Code via mail from eufy. Please enter this code:', async (code) => {
+      try {
+        await this.eufyClient.connect({
+          verifyCode: code,
+        });
+        this.log('EufyClient connected ' + this.eufyClient.isConnected(), true);
+      } catch (err) {
+        this.log('Error authenticating Eufy : ' + err, true);
+      }
+  
+      if (!this.eufyClient.isConnected()) {
+        this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
+        return;
+      }
+  
+      await this.refreshData(this.eufyClient);
+      await this.updateDevices();
+    });
+  }
+
+  onCaptchaRequest(id, captcha) {
+    this.log('Event: captcha request');
+    this.log('Got Captcha. View it under: ' + captcha, true);
+    readline.question('Please enter the captcha text: ', async (captchaCode) => {
+      try {
+        await this.eufyClient.connect({
+          captcha: {
+            captchaCode: captchaCode,
+            captchaId: id,
+          }
+        });
+        this.log('EufyClient connected ' + this.eufyClient.isConnected(), true);
+      } catch (err) {
+        this.log('Error authenticating Eufy : ' + err, true);
+      }
+  
+      if (!this.eufyClient.isConnected()) {
+        this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
+        return;
+      }
+  
+      await this.refreshData(this.eufyClient);
+      await this.updateDevices();
+    });
   }
 
   log(message, output) {

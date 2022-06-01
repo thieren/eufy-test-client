@@ -10,6 +10,8 @@ Small commandline application to test various functions of eufy-security-client 
 
 ### Current features
 - Connect to eufy security cloud
+- 2FA Authorization (untested)
+- Captcha Request handling (untested)
 - List stations and devices
 - Change guard mode on stations
 - save logfile
