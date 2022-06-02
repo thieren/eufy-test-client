@@ -319,20 +319,16 @@ class EufyPlatform {
     console.clear();
     console.log(this.stations[station].getName() + ' menu:\n');
     console.log('1. Change guard mode');
-    console.log('2. Change guard mode (alternative)');
-    console.log('3. Main Menu');
+    console.log('2. Main Menu');
 
     readline.question('Choice?   ', choice => {
 
       var value = this.getMenuChoice(choice);
       switch (value) {
         case 1:
-          this.actionGuardModeMenu(station, false);
+          this.actionGuardModeMenu(station);
         break;
         case 2:
-          this.actionGuardModeMenu(station, true);
-        break;
-        case 3:
           this.actionMainMenu();
         break;
         default:
@@ -343,7 +339,7 @@ class EufyPlatform {
     });
   }
 
-  actionGuardModeMenu(station, useRefresh) {
+  actionGuardModeMenu(station) {
     this.log('enter guard mode menu for station ' + this.stations[station].getName());
 
     const modes = [
@@ -406,7 +402,7 @@ class EufyPlatform {
 
       var value = this.getMenuChoice(choice);
       if (value === null) {
-        this.actionGuardModeMenu(station, useRefresh);
+        this.actionGuardModeMenu(station);
         return;
       }
 
@@ -418,7 +414,6 @@ class EufyPlatform {
       }
 
       try {
-        if (useRefresh) await this.eufyClient.refreshCloudData();
         await this.stations[station].setGuardMode(value);
       } catch (err) {
         this.log('An error occured: ' + err, true);
