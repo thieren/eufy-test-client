@@ -1,6 +1,11 @@
 # eufy-test-client
 Small commandline application to test various functions of eufy-security-client library
 
+### Important!
+
+This is just a tool I made so I get a better understanding of the inner workings of the eufy-security-client library.
+If you're looking for a more complete/robust/better programmed way to interact with this library on a command-line basis I strongly recommened that you check out eufy-securtiy-ws (https://github.com/bropat/eufy-security-ws)
+
 ### How to use
 
 1. Download the code to a folder on your computer.
@@ -10,8 +15,8 @@ Small commandline application to test various functions of eufy-security-client 
 
 ### Current features
 - Connect to eufy security cloud
-- 2FA Authorization (untested)
-- Captcha Request handling (untested)
+- 2FA Authorization
+- Captcha Request handling
 - List stations and devices
 - Change guard mode on stations
 - save logfile
