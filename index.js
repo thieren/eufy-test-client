@@ -3,8 +3,12 @@ const readline = require('readline').createInterface({
   output: process.stdout
 });
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 const { EufySecurity } = require('eufy-security-client');
+const ffmpegPath = require('ffmpeg-for-homebridge');
+
+const mp3Path = require.resolve('./sample.mp3');
 
 const { config } = require('./config');
 
@@ -112,6 +116,8 @@ class EufyPlatform {
     this.eufyClient.on('station alarm event', (station, event) => this.log('Event: Station ' + station.getName() + ' alarm event: ' + event));
     this.eufyClient.on('station connect', (station) => this.log('Event: Station ' + station.getName() + ' connect'));
     this.eufyClient.on('station close', (station) => this.log('Event: Station ' + station.getName() + ' close'));
+    this.eufyClient.on('station talkback start', (station, device, stream) => this.onStationTalkbackStart(station, device, stream));
+    this.eufyClient.on('station talkback stop', (station, device) => this.onStationTalkbackStop(station, device));
     this.eufyClient.on('push connect', () => this.log('Event: push connect'));
     this.eufyClient.on('push close', () => this.log('Event: push close'));
     this.eufyClient.on('push message', (message) => this.log('Event: push message: ' + JSON.stringify(message)));
@@ -468,9 +474,147 @@ class EufyPlatform {
   }
 
   actionDeviceMenu(device) {
-    this.log('selected device ' + device);
+    this.log('enter selected device ' + this.devices[device].getName() + ' menu (type: ' + this.devices[device].getDeviceType() + ')');
     
-    this.notImplementedYet();
+    console.clear();
+    console.log(this.devices[device].getName() + ' menu:\n');
+    console.log('1. Start P2P Livestream');
+    console.log('2. Stop P2P Livestream');
+    console.log('3. Start Talkback');
+    console.log('4. Stop Talkback');
+    console.log('5. Main Menu');
+
+    readline.question('Choice?   ', choice => {
+
+      var value = this.getMenuChoice(choice);
+      switch (value) {
+        case 1:
+          this.actionLivestreamStart(device);
+        break;
+        case 2:
+          this.actionLivestreamStop(device);
+        break;
+        case 3:
+          this.actionTalkbackStart(device);
+        break;
+        case 4:
+          this.actionTalkbackStop(device);
+        break;
+        case 5:
+          this.actionMainMenu();
+        break;
+        default:
+          this.actionDeviceMenu(device);
+          break;
+      }
+
+    });
+  }
+
+  async actionLivestreamStart(deviceId) {
+    console.clear();
+    const device = this.devices[deviceId];
+    this.log('Start p2p livestream on ' + device.getName() + '...', true);
+
+    try {
+      await this.eufyClient.startStationLivestream(device.getSerial());
+    } catch (err) {
+      this.log('Could not start talkback: ' + err, true);
+    }
+
+    setTimeout(() => {
+      this.actionDeviceMenu(deviceId);
+    }, 1000);
+  }
+
+  async actionLivestreamStop(deviceId) {
+    console.clear();
+    const device = this.devices[deviceId];
+    this.log('Stop p2p livestream on ' + device.getName() + '...', true);
+
+    try {
+      await this.eufyClient.stopStationLivestream(device.getSerial());
+    } catch (err) {
+      this.log('Could not start talkback: ' + err, true);
+    }
+
+    setTimeout(() => {
+      this.actionDeviceMenu(deviceId);
+    }, 1000);
+  }
+
+  async actionTalkbackStart(deviceId) {
+    console.clear();
+    const device = this.devices[deviceId];
+    this.log('Start talkback feature on ' + device.getName() + '...', true);
+
+    try {
+      await this.eufyClient.startStationTalkback(device.getSerial());
+    } catch (err) {
+      this.log('Could not start talkback: ' + err, true);
+    }
+
+    setTimeout(() => {
+      this.actionDeviceMenu(deviceId);
+    }, 5000);
+  }
+
+  onStationTalkbackStart(station, device, stream) {
+    this.log('Event: Talkback started from ' + device.getName() + ' on station ' + station.getName(), true);
+
+    const args = '-re -i ' + mp3Path + ' ' +
+                 '-acodec aac ' +
+                 '-ac 1 ' +
+                 '-ar 16k ' +
+                 '-b:a 16k ' +
+                 '-f adts pipe:1';
+    
+    const ffmpeg = spawn(ffmpegPath, args.split(/\s+/), { env: process.env });
+
+    ffmpeg.stdout.pipe(stream);
+
+    ffmpeg.on('error', (err) => {
+      this.log('FFMpeg error: ' + err);
+    });
+    ffmpeg.stderr.on('data', (data) => {
+      data.toString().split('\n').forEach((line) => {
+        if (line.length > 0) {
+          this.log(line);
+        }
+      });
+    });
+    ffmpeg.on('close', () => {
+      this.log('ffmpeg closed.');
+    });
+  }
+
+  async actionTalkbackStop(deviceId) {
+    console.clear();
+    const device = this.devices[deviceId];
+    this.log('Stop talkback feature on ' + device.getName() + '...', true);
+
+    try {
+      await this.eufyClient.stopStationTalkback(device.getSerial());
+    } catch (err) {
+      this.log('Could not stop talkback: ' + err, true);
+    }
+
+    setTimeout(() => {
+      this.actionDeviceMenu(deviceId);
+    }, 5000);
+  }
+
+  onStationTalkbackStop(station, device) {
+    this.log('Event: Talkback stopped from ' + device.getName() + ' on station ' + station.getName(), true);
+  }
+
+  getStation(serial) {
+    this.log('Trying to find station with serial ' + serial);
+    for (var i=0; i<this.stations.length; i++) {
+      if (this.stations[i].getSerial() == serial) return this.stations[i];
+    }
+
+    return null;
   }
 
   notImplementedYet() {

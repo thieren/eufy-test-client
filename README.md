@@ -19,6 +19,8 @@ If you're looking for a more complete/robust/better programmed way to interact w
 - Captcha Request handling
 - List stations and devices
 - Change guard mode on stations
+- Start/Stop P2P Livestream on devices
+- Test Talkback feature on devices (develop branch of eufy-security-client needed)
 - save logfile
 
 
