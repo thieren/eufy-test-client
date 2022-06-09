@@ -253,8 +253,9 @@ class EufyPlatform {
     console.log('Main menu: \n');
     console.log('1. Select Stations');
     console.log('2. Select Devices');
-    console.log('3. Show log');
-    console.log('4. Exit');
+    console.log('3. Settings');
+    console.log('4. Show log');
+    console.log('5. Exit');
 
     readline.question('Choice?   ', choice => {
 
@@ -267,9 +268,12 @@ class EufyPlatform {
           this.actionDevicesMenu();
         break;
         case 3:
-          this.showLog();
+          this.actionSettingsMenu();
         break;
         case 4:
+          this.showLog();
+        break;
+        case 5:
           this.close();
         break;
         default:
@@ -606,6 +610,60 @@ class EufyPlatform {
 
   onStationTalkbackStop(station, device) {
     this.log('Event: Talkback stopped from ' + device.getName() + ' on station ' + station.getName(), true);
+  }
+
+  actionSettingsMenu() {
+    this.log('Enter settings menu.')
+
+    console.clear();
+    console.log('Settings: \n');
+    console.log('1. Set maximum livestream duration')
+    console.log('2. Back');
+
+    readline.question('Choice?   ', choice => {
+
+      var value = this.getMenuChoice(choice);
+      if (!value || value < 1 || value > 2) {
+        this.actionSettingsMenu();
+        return;
+      }
+
+      switch (value) {
+        case 1:
+          this.actionMaxLivestreamDuration();
+        break;
+        case 2:
+          this.actionMainMenu();
+        break;
+        default:
+          this.actionSettingsMenu();
+        break;
+      }
+
+    });
+  }
+
+  actionMaxLivestreamDuration() {
+    this.log('Set maximum livestream duration');
+
+    console.clear();
+
+    readline.question('Enter maximum duration for livestreams (in seconds): ', choice => {
+      var value = this.getMenuChoice(choice);
+      if(!value || value < 1) {
+        this.log('No valid value entered!', true);
+        setTimeout(() => {
+          this.actionSettingsMenu();
+        }, 4000);
+        return;
+      }
+
+      this.eufyClient.setCameraMaxLivestreamDuration(value);
+      this.log('Set ' + value + ' seconds as maximum livestream duration.', true);
+      setTimeout(() => {
+        this.actionSettingsMenu();
+      }, 4000);
+    });
   }
 
   getStation(serial) {
