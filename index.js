@@ -329,7 +329,9 @@ class EufyPlatform {
     console.clear();
     console.log(this.stations[station].getName() + ' menu:\n');
     console.log('1. Change guard mode');
-    console.log('2. Main Menu');
+    console.log('2. Trigger alarm');
+    console.log('3. Reset alarm');
+    console.log('4. Main Menu');
 
     readline.question('Choice?   ', choice => {
 
@@ -339,6 +341,12 @@ class EufyPlatform {
           this.actionGuardModeMenu(station);
         break;
         case 2:
+          this.actionTriggerStationAlarm(station);
+        break;
+        case 3:
+          this.actionResetStationAlarm(station);
+        break;
+        case 4:
           this.actionMainMenu();
         break;
         default:
@@ -436,6 +444,41 @@ class EufyPlatform {
       }, 5000);
 
     });
+  }
+
+  actionTriggerStationAlarm(station) {
+    console.clear();
+    this.log('trigger station alarm for station ' + station);
+
+    readline.question('How long (in seconds)? ', choice => {
+
+      var value = this.getMenuChoice(choice);
+      if (!value || value < 0) {
+        this.log('No valid value!', true);
+        setTimeout(() => {
+          this.actionStationMenu(station);
+        }, 4000);
+        return;
+      }
+
+      this.log('alarm for ' + value + ' seconds');
+      this.stations[station].triggerStationAlarmSound(value);
+
+      setTimeout(() => {
+        this.actionStationMenu(station);
+      }, 2000);
+    });
+  }
+
+  actionResetStationAlarm(station) {
+    console.clear();
+    this.log('Reset station alarm for station ' + station, true);
+
+    this.stations[station].resetStationAlarmSound();
+
+    setTimeout(() => {
+      this.actionStationMenu(station);
+    }, 4000);
   }
 
   actionDevicesMenu() {
