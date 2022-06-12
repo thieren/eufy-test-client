@@ -8,11 +8,10 @@ If you're looking for a more complete/robust/better programmed way to interact w
 
 ### How to use
 
-1. Clone the code to your computer: `git clone --recursive https://github.com/thieren/eufy-test-client.git`
+1. Download the code to a folder on your computer.
 2. Edit `config.js` and update your credentials for the eufy cloud.
 3. Run `npm install` in a terminal in the location where you downloaded the code
-4. Go into the eufy-security-client directory and run these commands in succession: `npm install` and `npm run build`
-5. Run `node index.js` in main folder and follow the onscreen menu.
+4. Run `node index.js` and follow the onscreen menu.
 
 ### Current features
 - Connect to eufy security cloud
@@ -22,7 +21,7 @@ If you're looking for a more complete/robust/better programmed way to interact w
 - Change guard mode on stations
 - Trigger and reset alarm
 - Start/Stop P2P Livestream on devices
-- Test Talkback feature on devices (develop branch of eufy-security-client needed)
+- Test Talkback feature on devices
 - set maximum livestream duration
 - save logfile
 

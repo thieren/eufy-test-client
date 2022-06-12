@@ -1,4 +1,0 @@
-[submodule "eufy-security-client"]
-	path = eufy-security-client
-	url = https://github.com/bropat/eufy-security-client/
-	branch = develop
