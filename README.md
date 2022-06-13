@@ -21,6 +21,7 @@ See https://github.com/bropat/eufy-security-client/issues/167 for reference.
 Workaround:
 1. run `npm uninstall eufy-security-client`
 2. run `npm install eufy-security-client` again
+3. remove file `persistent.json`
 
 This should give you another login. Alternatively you can install a previous version of the library (`npm uninstall eufy-security-client@2.0.1`) but that will result in some features not working (e.g. talkback).
 
