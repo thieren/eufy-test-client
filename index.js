@@ -3,6 +3,7 @@ const readline = require('readline').createInterface({
   output: process.stdout
 });
 const fs = require('fs');
+const path = require('path');
 const { spawn } = require('child_process');
 
 const { EufySecurity } = require('eufy-security-client');
@@ -17,56 +18,115 @@ if (config.username == '*****' || config.password == '*****') {
   process.exit();
 }
 
+config.persistentDir = path.resolve(__dirname, '.');
+
+class Logger {
+
+  logMessages = [];
+
+  concatMessages(...messages) {
+    let msg = '';
+    for (let i=0; i<messages.length; i++) {
+      if (typeof messages[i] === 'string' || messages[i] instanceof String) {
+        msg += messages[i];
+      } else {
+        msg += JSON.stringify(messages[i]);
+      }
+    }
+    return msg;
+  }
+
+  infoAndPrint(...messages) {
+    this.info(...messages);
+    console.log(this.concatMessages(...messages));
+  }
+
+  info(...messages) {
+    const message = 'INFO: ' + this.concatMessages(...messages);
+    this.logMessages.push({
+      time: new Date().toISOString(),
+      message: message
+    });
+  }
+
+  debug(...messages) {
+    const message = 'DEBUG: ' + this.concatMessages(...messages);
+    this.logMessages.push({
+      time: new Date().toISOString(),
+      message: message
+    });
+  }
+
+  warn(...messages) {
+    const message = 'WARN: ' + this.concatMessages(...messages);
+    this.logMessages.push({
+      time: new Date().toISOString(),
+      message: message
+    });
+  }
+
+  error(...messages) {
+    const message = 'ERROR: ' + this.concatMessages(...messages);
+    this.logMessages.push({
+      time: new Date().toISOString(),
+      message: message
+    });
+  }
+}
+
 class EufyPlatform {
 
   eufyClient = null;
   config = null;
   refreshTimeout = null;
 
-  logMessages = [];
-
   stations = [];
   devices = [];
 
+  log = null;
+  eufyLibraryLog = null;
+
   constructor(config) {
-    this.log('Initializing...', true);
+    this.log = new Logger();
+    this.eufyLibraryLog = new Logger();
+    this.log.infoAndPrint('Initializing...');
 
     this.config = config;
   }
 
   async connect() {
-    this.eufyClient = await EufySecurity.initialize(this.config);
+    this.eufyClient = await EufySecurity.initialize(this.config, this.eufyLibraryLog);
 
     this.connectLoginHandlers();
 
     try {
       await this.eufyClient.connect();
-      this.log('EufyClient connected ' + this.eufyClient.isConnected());
+      this.log.info('EufyClient connected ' + this.eufyClient.isConnected());
     } catch (err) {
-      this.log('Error authenticating Eufy : ' + err, true);
+      this.log.infoAndPrint('Error authenticating Eufy : ' + err);
     }
 
     if (!this.eufyClient.isConnected()) {
-      this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
+      this.log.infoAndPrint('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.');
     }
   }
 
   async refreshData(client) {
-    this.log(
+    this.log.info(
       `PollingInterval: 10 minutes`
     );
     if (client) {
-      this.log('Refresh data from cloud and schedule next refresh.');
+      this.log.info('Refresh data from cloud and schedule next refresh.');
       try {
         await client.refreshCloudData();
       } catch (error) {
-        this.log('Error refreshing data from Eufy: ', error);
+        this.log.info('Error refreshing data from Eufy: ', error);
       }
       this.refreshTimeout = setTimeout(() => {
         try {
           this.refreshData(client);
         } catch (error) {
-          this.log('Error refreshing data from Eufy: ', error);
+          this.log.info('Error refreshing data from Eufy: ', error);
         }
       }, 10 * 60 * 1000);
     }
@@ -76,7 +136,7 @@ class EufyPlatform {
     this.eufyClient.on('tfa request', () => this.onTFARequest());
     this.eufyClient.on('captcha request', (id, captcha) => this.onCaptchaRequest(id, captcha));
     this.eufyClient.on('connect', async () => {
-      this.log('Event: connect', true)
+      this.log.infoAndPrint('Event: connect')
       this.connectEventHandlers();
 
       await this.refreshData(this.eufyClient);
@@ -87,70 +147,70 @@ class EufyPlatform {
   }
 
   connectEventHandlers() {
-    this.eufyClient.on('device added', (device) => this.log('Event: Device ' + device.getName() + ' added.'));
-    this.eufyClient.on('device removed', (device) => this.log('Event: Device ' + device.getName() + ' removed.'));
-    this.eufyClient.on('device property changed', (device, name, value) => this.log('Event: Device' + device.getName() + ' property: ' + name + ' changed to: ' + value));
-    this.eufyClient.on('device raw property changed', (device, type, value) => this.log('Event: Device' + device.getName() + ' raw property: ' + type + ' changed to: ' + value));
-    this.eufyClient.on('device crying detected', (device, state) => this.log('Event: Device' + device.getName() + ' crying detected: ' + state));
-    this.eufyClient.on('device sound detected', (device, state) => this.log('Event: Device' + device.getName() + ' sound detected: ' + state));
-    this.eufyClient.on('device pet detected', (device, state) => this.log('Event: Device' + device.getName() + ' pet detected: ' + state));
-    this.eufyClient.on('device motion detected', (device, state) => this.log('Event: Device' + device.getName() + ' motion detected: ' + state));
-    this.eufyClient.on('device person detected', (device, state) => this.log('Event: Device' + device.getName() + ' person detected: ' + state));
-    this.eufyClient.on('device rings', (device, state) => this.log('Event: Device' + device.getName() + ' rings: ' + state));
-    this.eufyClient.on('device locked', (device, state) => this.log('Event: Device' + device.getName() + ' locked: ' + state));
-    this.eufyClient.on('device open', (device, state) => this.log('Event: Device' + device.getName() + ' open: ' + state));
-    this.eufyClient.on('station added', (station) => this.log('Event: Station ' + station.getName() + ' added.'));
-    this.eufyClient.on('station removed', (station) => this.log('Event: Station ' + station.getName() + ' removed.'));
-    this.eufyClient.on('station livestream start', (station, device) => this.log('Event: Station ' + station.getName() + ' livestream start from ' + device.getName()));
-    this.eufyClient.on('station livestream stop', (station, device) => this.log('Event: Station ' + station.getName() + ' livestream stop from ' + device.getName()));
-    this.eufyClient.on('station download start', (station, device) => this.log('Event: Station ' + station.getName() + ' download start from ' + device.getName()));
-    this.eufyClient.on('station download finish', (station, device) => this.log('Event: Station ' + station.getName() + ' download finish from ' + device.getName()));
-    this.eufyClient.on('station command result', (station,result) => this.log('Event: Station ' + station.getName() + ' command result: ' + JSON.stringify(result)));
-    this.eufyClient.on('station rtsp livestream start', (station, device) => this.log('Event: Station ' + station.getName() + ' rtsp livestream start from ' + device.getName()));
-    this.eufyClient.on('station rtsp livestream stop', (station, device) => this.log('Event: Station ' + station.getName() + ' rtsp livestream stop from ' + device.getName()));
-    this.eufyClient.on('station rtsp url', (station, device, url) => this.log('Event: Station ' + station.getName() + ' rtsp url from ' + device.getName() + ': ' + url));
-    this.eufyClient.on('station guard mode', (station, value) => this.log('Event: Station ' + station.getName() + ' guard mode: ' + value));
-    this.eufyClient.on('station current mode', (station, value) => this.log('Event: Station ' + station.getName() + ' current mode: ' + value));
-    this.eufyClient.on('station property changed', (station, name, value) => this.log('Event: Station' + station.getName() + ' property: ' + name + ' changed to: ' + value));
-    this.eufyClient.on('station raw property changed', (station, type, value) => this.log('Event: Station' + station.getName() + ' raw property: ' + type + ' changed to: ' + value));
-    this.eufyClient.on('station alarm event', (station, event) => this.log('Event: Station ' + station.getName() + ' alarm event: ' + event));
-    this.eufyClient.on('station connect', (station) => this.log('Event: Station ' + station.getName() + ' connect'));
-    this.eufyClient.on('station close', (station) => this.log('Event: Station ' + station.getName() + ' close'));
+    this.eufyClient.on('device added', (device) => this.log.info('Event: Device ' + device.getName() + ' added.'));
+    this.eufyClient.on('device removed', (device) => this.log.info('Event: Device ' + device.getName() + ' removed.'));
+    this.eufyClient.on('device property changed', (device, name, value) => this.log.info('Event: Device' + device.getName() + ' property: ' + name + ' changed to: ' + value));
+    this.eufyClient.on('device raw property changed', (device, type, value) => this.log.info('Event: Device' + device.getName() + ' raw property: ' + type + ' changed to: ' + value));
+    this.eufyClient.on('device crying detected', (device, state) => this.log.info('Event: Device' + device.getName() + ' crying detected: ' + state));
+    this.eufyClient.on('device sound detected', (device, state) => this.log.info('Event: Device' + device.getName() + ' sound detected: ' + state));
+    this.eufyClient.on('device pet detected', (device, state) => this.log.info('Event: Device' + device.getName() + ' pet detected: ' + state));
+    this.eufyClient.on('device motion detected', (device, state) => this.log.info('Event: Device' + device.getName() + ' motion detected: ' + state));
+    this.eufyClient.on('device person detected', (device, state) => this.log.info('Event: Device' + device.getName() + ' person detected: ' + state));
+    this.eufyClient.on('device rings', (device, state) => this.log.info('Event: Device' + device.getName() + ' rings: ' + state));
+    this.eufyClient.on('device locked', (device, state) => this.log.info('Event: Device' + device.getName() + ' locked: ' + state));
+    this.eufyClient.on('device open', (device, state) => this.log.info('Event: Device' + device.getName() + ' open: ' + state));
+    this.eufyClient.on('station added', (station) => this.log.info('Event: Station ' + station.getName() + ' added.'));
+    this.eufyClient.on('station removed', (station) => this.log.info('Event: Station ' + station.getName() + ' removed.'));
+    this.eufyClient.on('station livestream start', (station, device) => this.log.info('Event: Station ' + station.getName() + ' livestream start from ' + device.getName()));
+    this.eufyClient.on('station livestream stop', (station, device) => this.log.info('Event: Station ' + station.getName() + ' livestream stop from ' + device.getName()));
+    this.eufyClient.on('station download start', (station, device) => this.log.info('Event: Station ' + station.getName() + ' download start from ' + device.getName()));
+    this.eufyClient.on('station download finish', (station, device) => this.log.info('Event: Station ' + station.getName() + ' download finish from ' + device.getName()));
+    this.eufyClient.on('station command result', (station,result) => this.log.info('Event: Station ' + station.getName() + ' command result: ' + JSON.stringify(result)));
+    this.eufyClient.on('station rtsp livestream start', (station, device) => this.log.info('Event: Station ' + station.getName() + ' rtsp livestream start from ' + device.getName()));
+    this.eufyClient.on('station rtsp livestream stop', (station, device) => this.log.info('Event: Station ' + station.getName() + ' rtsp livestream stop from ' + device.getName()));
+    this.eufyClient.on('station rtsp url', (station, device, url) => this.log.info('Event: Station ' + station.getName() + ' rtsp url from ' + device.getName() + ': ' + url));
+    this.eufyClient.on('station guard mode', (station, value) => this.log.info('Event: Station ' + station.getName() + ' guard mode: ' + value));
+    this.eufyClient.on('station current mode', (station, value) => this.log.info('Event: Station ' + station.getName() + ' current mode: ' + value));
+    this.eufyClient.on('station property changed', (station, name, value) => this.log.info('Event: Station' + station.getName() + ' property: ' + name + ' changed to: ' + value));
+    this.eufyClient.on('station raw property changed', (station, type, value) => this.log.info('Event: Station' + station.getName() + ' raw property: ' + type + ' changed to: ' + value));
+    this.eufyClient.on('station alarm event', (station, event) => this.log.info('Event: Station ' + station.getName() + ' alarm event: ' + event));
+    this.eufyClient.on('station connect', (station) => this.log.info('Event: Station ' + station.getName() + ' connect'));
+    this.eufyClient.on('station close', (station) => this.log.info('Event: Station ' + station.getName() + ' close'));
     this.eufyClient.on('station talkback start', (station, device, stream) => this.onStationTalkbackStart(station, device, stream));
     this.eufyClient.on('station talkback stop', (station, device) => this.onStationTalkbackStop(station, device));
-    this.eufyClient.on('push connect', () => this.log('Event: push connect'));
-    this.eufyClient.on('push close', () => this.log('Event: push close'));
-    this.eufyClient.on('push message', (message) => this.log('Event: push message: ' + JSON.stringify(message)));
-    this.eufyClient.on('close', () => this.log('Event: close'));
-    this.eufyClient.on('cloud livestream start', (station, device, url) => this.log('Event: Station ' + station.getName() + ' cloud livestream start from ' + device.getName() + ' - url: ' + url));
-    this.eufyClient.on('cloud livestream stop', (station, device) => this.log('Event: Station ' + station.getName() + ' cloud livestream stop from ' + device.getName()));
-    this.eufyClient.on('mqtt connect', () => this.log('Event: mqtt connect'));
-    this.eufyClient.on('mqtt close', () => this.log('Event: mqtt close'));
-    this.eufyClient.on('mqtt lock message', (message) => this.log('Event: mqtt message: ' + JSON.stringify(message)));
+    this.eufyClient.on('push connect', () => this.log.info('Event: push connect'));
+    this.eufyClient.on('push close', () => this.log.info('Event: push close'));
+    this.eufyClient.on('push message', (message) => this.log.info('Event: push message: ' + JSON.stringify(message)));
+    this.eufyClient.on('close', () => this.log.info('Event: close'));
+    this.eufyClient.on('cloud livestream start', (station, device, url) => this.log.info('Event: Station ' + station.getName() + ' cloud livestream start from ' + device.getName() + ' - url: ' + url));
+    this.eufyClient.on('cloud livestream stop', (station, device) => this.log.info('Event: Station ' + station.getName() + ' cloud livestream stop from ' + device.getName()));
+    this.eufyClient.on('mqtt connect', () => this.log.info('Event: mqtt connect'));
+    this.eufyClient.on('mqtt close', () => this.log.info('Event: mqtt close'));
+    this.eufyClient.on('mqtt lock message', (message) => this.log.info('Event: mqtt message: ' + JSON.stringify(message)));
   }
 
   onTFARequest() {
-    this.log('Event: 2FA request');
+    this.log.info('Event: 2FA request');
     readline.question('You should have gotten a OTP Code via mail from eufy. Please enter this code:', async (code) => {
       try {
         await this.eufyClient.connect({
           verifyCode: code,
         });
-        this.log('EufyClient connected ' + this.eufyClient.isConnected(), true);
+        this.log.infoAndPrint('EufyClient connected ' + this.eufyClient.isConnected());
       } catch (err) {
-        this.log('Error authenticating Eufy : ' + err, true);
+        this.log.infoAndPrint('Error authenticating Eufy : ' + err);
       }
   
       if (!this.eufyClient.isConnected()) {
-        this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
+        this.log.infoAndPrint('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.');
         return;
       }
     });
   }
 
   onCaptchaRequest(id, captcha) {
-    this.log('Event: captcha request');
-    this.log('Got Captcha. View it under: ' + captcha, true);
+    this.log.info('Event: captcha request');
+    this.log.infoAndPrint('Got Captcha. View it under: ' + captcha);
     readline.question('Please enter the captcha text: ', async (captchaCode) => {
       try {
         await this.eufyClient.connect({
@@ -159,45 +219,37 @@ class EufyPlatform {
             captchaId: id,
           }
         });
-        this.log('EufyClient connected ' + this.eufyClient.isConnected(), true);
+        this.log.infoAndPrint('EufyClient connected ' + this.eufyClient.isConnected());
       } catch (err) {
-        this.log('Error authenticating Eufy : ' + err, true);
+        this.log.infoAndPrint('Error authenticating Eufy : ' + err);
       }
   
       if (!this.eufyClient.isConnected()) {
-        this.log('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.', true);
+        this.log.infoAndPrint('Not connected can\'t continue! Maybe wrong credentials or captcha or 2FA.');
         return;
       }
     });
   }
 
-  log(message, output) {
-    this.logMessages.push({
-      time: new Date().toISOString(),
-      message: message
-    });
-    if (output) console.log(message);
-  }
-
   showLog() {
     console.clear();
-    this.logMessages.forEach((msg) => {
+    this.log.logMessages.forEach((msg) => {
       console.log(msg.time + ' - ' + msg.message);
     });
     readline.question('Type \'save\' to write log to file in your current working directory or hit Enter to go back:  ', (text) => {
       if (text == 'save') {
-        const filename = 'eufylog_' + Date.now() + '.txt';
-        this.log('Writing log messages to file ' + filename + '...', true);
+        const filename = 'log_' + Date.now() + '.txt';
+        this.log.infoAndPrint('Writing log messages to file ' + filename + '...');
         try {
           const file = fs.createWriteStream(filename, { flags: 'w' });
           file.setDefaultEncoding('utf8');
-          this.logMessages.forEach((msg) => {
+          this.log.logMessages.forEach((msg) => {
             file.write(msg.time + ' - ' + msg.message + '\n');
           });
-          this.log('File written');
+          this.log.info('File written');
           file.close();
         } catch (err) {
-          this.log('File could not be written. Maybe check permissions!');
+          this.log.info('File could not be written. Maybe check permissions!');
         }
         this.showLog();
         return;
@@ -206,13 +258,35 @@ class EufyPlatform {
     });
   }
 
+  saveEufyLog() {
+    console.clear();
+    const filename = 'eufy-security-client_log_' + Date.now() + '.txt';
+    this.log.infoAndPrint('Writing log messages to file ' + filename + '...');
+    try {
+      const file = fs.createWriteStream(filename, { flags: 'w' });
+      file.setDefaultEncoding('utf8');
+      this.eufyLibraryLog.logMessages.forEach((msg) => {
+        file.write(msg.time + ' - ' + msg.message + '\n');
+      });
+      this.log.infoAndPrint('File written');
+      file.close();
+    } catch (err) {
+      this.log.infoAndPrint('File could not be written. Maybe check permissions!');
+    }
+
+    setTimeout(() => {
+      console.log('Returning to main menu...');
+      this.actionMainMenu();
+    }, 4000);
+  }
+
   async updateDevices() {
-    this.log('Updating station and device list.');
+    this.log.info('Updating station and device list.');
     const eufyStations = await this.eufyClient.getStations();
-    this.log('Found ' + eufyStations.length + ' stations.');
+    this.log.info('Found ' + eufyStations.length + ' stations.');
 
     for (const station of eufyStations) {
-      this.log(
+      this.log.info(
         'Found Station',
         station.getSerial(),
         station.getName(),
@@ -223,7 +297,7 @@ class EufyPlatform {
     }
 
     const eufyDevices = await this.eufyClient.getDevices();
-    this.log('Found ' + eufyDevices.length + ' devices.');
+    this.log.info('Found ' + eufyDevices.length + ' devices.');
 
     for (const device of eufyDevices) {
       console.log(
@@ -236,9 +310,16 @@ class EufyPlatform {
   }
 
   async close() {
+    console.log('Shutting down...');
     if (this.refreshTimeout) clearTimeout(this.refreshTimeout);
+    this.eufyClient.once('close', () => {
+      console.log('Finished shutdown!');
+      process.exit();
+    });
     await this.eufyClient.close();
-    process.exit();
+    setTimeout(() => {
+      process.exit();
+    }, 10000);
   }
 
   getMenuChoice(choice) {
@@ -248,14 +329,15 @@ class EufyPlatform {
   }
 
   actionMainMenu() {
-    this.log('Enter Main menu.');
+    this.log.info('Enter Main menu.');
     console.clear();
     console.log('Main menu: \n');
     console.log('1. Select Stations');
     console.log('2. Select Devices');
     console.log('3. Settings');
     console.log('4. Show log');
-    console.log('5. Exit');
+    console.log('5. Save eufy-security-client library log');
+    console.log('6. Exit');
 
     readline.question('Choice?   ', choice => {
 
@@ -274,6 +356,9 @@ class EufyPlatform {
           this.showLog();
         break;
         case 5:
+          this.saveEufyLog();
+        break;
+        case 6:
           this.close();
         break;
         default:
@@ -285,10 +370,10 @@ class EufyPlatform {
   }
 
   actionStationsMenu() {
-    this.log('Enter stations menu.')
+    this.log.info('Enter stations menu.')
 
     if (this.stations.length == 0) {
-      this.log('There were no stations found! Going back...', true);
+      this.log.infoAndPrint('There were no stations found! Going back...');
       setTimeout(() => {
         this.actionMainMenu();
       }, 4000);
@@ -324,7 +409,7 @@ class EufyPlatform {
   }
 
   actionStationMenu(station) {
-    this.log('enter selected station ' + this.stations[station].getName() + ' menu');
+    this.log.info('enter selected station ' + this.stations[station].getName() + ' menu');
     
     console.clear();
     console.log(this.stations[station].getName() + ' menu:\n');
@@ -358,7 +443,7 @@ class EufyPlatform {
   }
 
   actionGuardModeMenu(station) {
-    this.log('enter guard mode menu for station ' + this.stations[station].getName());
+    this.log.info('enter guard mode menu for station ' + this.stations[station].getName());
 
     const modes = [
       {
@@ -426,19 +511,19 @@ class EufyPlatform {
 
       const mode = modes.filter((m) => { return m.id == value });
       if (mode.length == 0) {
-        this.log('Value of ' + value + ' doesn\'t seem to map to a regognized guard mode. Trying anyway...', true);
+        this.log.infoAndPrint('Value of ' + value + ' doesn\'t seem to map to a regognized guard mode. Trying anyway...');
       } else {
-        this.log('Trying to set guard mode to (' + mode[0].id + ') ' + mode[0].name, true);
+        this.log.infoAndPrint('Trying to set guard mode to (' + mode[0].id + ') ' + mode[0].name);
       }
 
       try {
         await this.stations[station].setGuardMode(value);
       } catch (err) {
-        this.log('An error occured: ' + err, true);
+        this.log.infoAndPrint('An error occured: ' + err);
       }
 
 
-      this.log('Command executed. Returning to main menu...', true);
+      this.log.infoAndPrint('Command executed. Returning to main menu...');
       setTimeout(() => {
         this.actionMainMenu();
       }, 5000);
@@ -448,20 +533,20 @@ class EufyPlatform {
 
   actionTriggerStationAlarm(station) {
     console.clear();
-    this.log('trigger station alarm for station ' + station);
+    this.log.info('trigger station alarm for station ' + station);
 
     readline.question('How long (in seconds)? ', choice => {
 
       var value = this.getMenuChoice(choice);
       if (!value || value < 0) {
-        this.log('No valid value!', true);
+        this.log.infoAndPrint('No valid value!');
         setTimeout(() => {
           this.actionStationMenu(station);
         }, 4000);
         return;
       }
 
-      this.log('alarm for ' + value + ' seconds');
+      this.log.info('alarm for ' + value + ' seconds');
       this.stations[station].triggerStationAlarmSound(value);
 
       setTimeout(() => {
@@ -472,7 +557,7 @@ class EufyPlatform {
 
   actionResetStationAlarm(station) {
     console.clear();
-    this.log('Reset station alarm for station ' + station, true);
+    this.log.infoAndPrint('Reset station alarm for station ' + station);
 
     this.stations[station].resetStationAlarmSound();
 
@@ -482,10 +567,10 @@ class EufyPlatform {
   }
 
   actionDevicesMenu() {
-    this.log('Enter devices menu.')
+    this.log.info('Enter devices menu.')
 
     if (this.devices.length == 0) {
-      this.log('There were no devices found! Going back...', true);
+      this.log.infoAndPrint('There were no devices found! Going back...');
       setTimeout(() => {
         this.actionMainMenu();
       }, 4000);
@@ -521,7 +606,7 @@ class EufyPlatform {
   }
 
   actionDeviceMenu(device) {
-    this.log('enter selected device ' + this.devices[device].getName() + ' menu (type: ' + this.devices[device].getDeviceType() + ')');
+    this.log.info('enter selected device ' + this.devices[device].getName() + ' menu (type: ' + this.devices[device].getDeviceType() + ')');
     
     console.clear();
     console.log(this.devices[device].getName() + ' menu:\n');
@@ -561,12 +646,12 @@ class EufyPlatform {
   async actionLivestreamStart(deviceId) {
     console.clear();
     const device = this.devices[deviceId];
-    this.log('Start p2p livestream on ' + device.getName() + '...', true);
+    this.log.infoAndPrint('Start p2p livestream on ' + device.getName() + '...');
 
     try {
       await this.eufyClient.startStationLivestream(device.getSerial());
     } catch (err) {
-      this.log('Could not start talkback: ' + err, true);
+      this.log.infoAndPrint('Could not start talkback: ' + err);
     }
 
     setTimeout(() => {
@@ -577,12 +662,12 @@ class EufyPlatform {
   async actionLivestreamStop(deviceId) {
     console.clear();
     const device = this.devices[deviceId];
-    this.log('Stop p2p livestream on ' + device.getName() + '...', true);
+    this.log.infoAndPrint('Stop p2p livestream on ' + device.getName() + '...');
 
     try {
       await this.eufyClient.stopStationLivestream(device.getSerial());
     } catch (err) {
-      this.log('Could not start talkback: ' + err, true);
+      this.log.infoAndPrint('Could not start talkback: ' + err);
     }
 
     setTimeout(() => {
@@ -593,12 +678,12 @@ class EufyPlatform {
   async actionTalkbackStart(deviceId) {
     console.clear();
     const device = this.devices[deviceId];
-    this.log('Start talkback feature on ' + device.getName() + '...', true);
+    this.log.infoAndPrint('Start talkback feature on ' + device.getName() + '...');
 
     try {
       await this.eufyClient.startStationTalkback(device.getSerial());
     } catch (err) {
-      this.log('Could not start talkback: ' + err, true);
+      this.log.infoAndPrint('Could not start talkback: ' + err);
     }
 
     setTimeout(() => {
@@ -607,7 +692,7 @@ class EufyPlatform {
   }
 
   onStationTalkbackStart(station, device, stream) {
-    this.log('Event: Talkback started from ' + device.getName() + ' on station ' + station.getName(), true);
+    this.log.infoAndPrint('Event: Talkback started from ' + device.getName() + ' on station ' + station.getName());
 
     const args = '-re -i ' + mp3Path + ' ' +
                  '-acodec aac ' +
@@ -621,29 +706,29 @@ class EufyPlatform {
     ffmpeg.stdout.pipe(stream);
 
     ffmpeg.on('error', (err) => {
-      this.log('FFMpeg error: ' + err);
+      this.log.info('FFMpeg error: ' + err);
     });
     ffmpeg.stderr.on('data', (data) => {
       data.toString().split('\n').forEach((line) => {
         if (line.length > 0) {
-          this.log(line);
+          this.log.info(line);
         }
       });
     });
     ffmpeg.on('close', () => {
-      this.log('ffmpeg closed.');
+      this.log.info('ffmpeg closed.');
     });
   }
 
   async actionTalkbackStop(deviceId) {
     console.clear();
     const device = this.devices[deviceId];
-    this.log('Stop talkback feature on ' + device.getName() + '...', true);
+    this.log.infoAndPrint('Stop talkback feature on ' + device.getName() + '...');
 
     try {
       await this.eufyClient.stopStationTalkback(device.getSerial());
     } catch (err) {
-      this.log('Could not stop talkback: ' + err, true);
+      this.log.infoAndPrint('Could not stop talkback: ' + err);
     }
 
     setTimeout(() => {
@@ -652,11 +737,11 @@ class EufyPlatform {
   }
 
   onStationTalkbackStop(station, device) {
-    this.log('Event: Talkback stopped from ' + device.getName() + ' on station ' + station.getName(), true);
+    this.log.infoAndPrint('Event: Talkback stopped from ' + device.getName() + ' on station ' + station.getName());
   }
 
   actionSettingsMenu() {
-    this.log('Enter settings menu.')
+    this.log.info('Enter settings menu.')
 
     console.clear();
     console.log('Settings: \n');
@@ -687,14 +772,14 @@ class EufyPlatform {
   }
 
   actionMaxLivestreamDuration() {
-    this.log('Set maximum livestream duration');
+    this.log.info('Set maximum livestream duration');
 
     console.clear();
 
     readline.question('Enter maximum duration for livestreams (in seconds): ', choice => {
       var value = this.getMenuChoice(choice);
       if(!value || value < 1) {
-        this.log('No valid value entered!', true);
+        this.log.infoAndPrint('No valid value entered!');
         setTimeout(() => {
           this.actionSettingsMenu();
         }, 4000);
@@ -702,7 +787,7 @@ class EufyPlatform {
       }
 
       this.eufyClient.setCameraMaxLivestreamDuration(value);
-      this.log('Set ' + value + ' seconds as maximum livestream duration.', true);
+      this.log.infoAndPrint('Set ' + value + ' seconds as maximum livestream duration.');
       setTimeout(() => {
         this.actionSettingsMenu();
       }, 4000);
@@ -710,7 +795,7 @@ class EufyPlatform {
   }
 
   getStation(serial) {
-    this.log('Trying to find station with serial ' + serial);
+    this.log.info('Trying to find station with serial ' + serial);
     for (var i=0; i<this.stations.length; i++) {
       if (this.stations[i].getSerial() == serial) return this.stations[i];
     }
@@ -719,7 +804,7 @@ class EufyPlatform {
   }
 
   notImplementedYet() {
-    this.log('Not implemented yet! Going back...', true);
+    this.log.infoAndPrint('Not implemented yet! Going back...');
     setTimeout(() => {
       this.actionMainMenu();
     }, 4000);

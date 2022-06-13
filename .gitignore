@@ -102,3 +102,14 @@ dist
 
 # TernJS port file
 .tern-port
+
+# macOS Junk
+._*
+
+# vscode
+.VSCode*
+
+# logs
+eufy-security-client_log*
+
+persistent.json
