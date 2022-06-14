@@ -32,6 +32,7 @@ class Logger {
       } else {
         msg += JSON.stringify(messages[i]);
       }
+      msg += ' ';
     }
     return msg;
   }
@@ -111,27 +112,6 @@ class EufyPlatform {
     }
   }
 
-  async refreshData(client) {
-    this.log.info(
-      `PollingInterval: 10 minutes`
-    );
-    if (client) {
-      this.log.info('Refresh data from cloud and schedule next refresh.');
-      try {
-        await client.refreshCloudData();
-      } catch (error) {
-        this.log.info('Error refreshing data from Eufy: ', error);
-      }
-      this.refreshTimeout = setTimeout(() => {
-        try {
-          this.refreshData(client);
-        } catch (error) {
-          this.log.info('Error refreshing data from Eufy: ', error);
-        }
-      }, 10 * 60 * 1000);
-    }
-  }
-
   connectLoginHandlers() {
     this.eufyClient.on('tfa request', () => this.onTFARequest());
     this.eufyClient.on('captcha request', (id, captcha) => this.onCaptchaRequest(id, captcha));
@@ -139,7 +119,6 @@ class EufyPlatform {
       this.log.infoAndPrint('Event: connect')
       this.connectEventHandlers();
 
-      await this.refreshData(this.eufyClient);
       await this.updateDevices();
 
       this.actionMainMenu();
@@ -147,7 +126,7 @@ class EufyPlatform {
   }
 
   connectEventHandlers() {
-    this.eufyClient.on('device added', (device) => this.log.info('Event: Device ' + device.getName() + ' added.'));
+    this.eufyClient.on('device added', (device) => this.onDeviceAdded(device));
     this.eufyClient.on('device removed', (device) => this.log.info('Event: Device ' + device.getName() + ' removed.'));
     this.eufyClient.on('device property changed', (device, name, value) => this.log.info('Event: Device' + device.getName() + ' property: ' + name + ' changed to: ' + value));
     this.eufyClient.on('device raw property changed', (device, type, value) => this.log.info('Event: Device' + device.getName() + ' raw property: ' + type + ' changed to: ' + value));
@@ -159,7 +138,7 @@ class EufyPlatform {
     this.eufyClient.on('device rings', (device, state) => this.log.info('Event: Device' + device.getName() + ' rings: ' + state));
     this.eufyClient.on('device locked', (device, state) => this.log.info('Event: Device' + device.getName() + ' locked: ' + state));
     this.eufyClient.on('device open', (device, state) => this.log.info('Event: Device' + device.getName() + ' open: ' + state));
-    this.eufyClient.on('station added', (station) => this.log.info('Event: Station ' + station.getName() + ' added.'));
+    this.eufyClient.on('station added', (station) => this.onStationAdded(station));
     this.eufyClient.on('station removed', (station) => this.log.info('Event: Station ' + station.getName() + ' removed.'));
     this.eufyClient.on('station livestream start', (station, device) => this.log.info('Event: Station ' + station.getName() + ' livestream start from ' + device.getName()));
     this.eufyClient.on('station livestream stop', (station, device) => this.log.info('Event: Station ' + station.getName() + ' livestream stop from ' + device.getName()));
@@ -187,6 +166,16 @@ class EufyPlatform {
     this.eufyClient.on('mqtt connect', () => this.log.info('Event: mqtt connect'));
     this.eufyClient.on('mqtt close', () => this.log.info('Event: mqtt close'));
     this.eufyClient.on('mqtt lock message', (message) => this.log.info('Event: mqtt message: ' + JSON.stringify(message)));
+  }
+
+  onDeviceAdded(device) {
+    this.log.info('Event: Device ' + device.getName() + ' added.');
+    this.updateDevices();
+  }
+
+  onStationAdded(station) {
+    this.log.info('Event: Station ' + station.getName() + ' added.');
+    this.updateDevices();
   }
 
   onTFARequest() {
@@ -293,20 +282,32 @@ class EufyPlatform {
         station.getLANIPAddress(),
       );
 
-      this.stations.push(station);
+      this.addStation(station);
     }
 
     const eufyDevices = await this.eufyClient.getDevices();
     this.log.info('Found ' + eufyDevices.length + ' devices.');
 
     for (const device of eufyDevices) {
-      console.log(
+      this.log.info(
         'Found device',
         device.getSerial(),
         device.getName(),
       );
-      this.devices.push(device);
+      this.addDevice(device);
     }
+  }
+
+  addDevice(device) {
+    let exists = false;
+    this.devices.forEach((d) => { if (d.getSerial() === device.getSerial()) exists = true; });
+    if (!exists) this.devices.push(device);
+  }
+
+  addStation(station) {
+    let exists = false;
+    this.stations.forEach((s) => { if (s.getSerial() === station.getSerial()) exists = true; });
+    if (!exists) this.stations.push(station);
   }
 
   async close() {

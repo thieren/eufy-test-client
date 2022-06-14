@@ -13,18 +13,6 @@ If you're looking for a more complete/robust/better programmed way to interact w
 3. Run `npm install` in a terminal in the location where you downloaded the code
 4. Run `node index.js` and follow the onscreen menu.
 
-### Known issue
-
-It might happen that only the first login works and any subsequent login attempts fail with an error saying that `device.getStationSerial is not a function`
-See https://github.com/bropat/eufy-security-client/issues/167 for reference.
-
-Workaround:
-1. run `npm uninstall eufy-security-client`
-2. run `npm install eufy-security-client` again
-3. remove file `persistent.json`
-
-This should give you another login. Alternatively you can install a previous version of the library (`npm uninstall eufy-security-client@2.0.1`) but that will result in some features not working (e.g. talkback).
-
 ### Current features
 - Connect to eufy security cloud
 - 2FA Authorization
