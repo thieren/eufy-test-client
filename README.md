@@ -8,10 +8,11 @@ If you're looking for a more complete/robust/better programmed way to interact w
 
 ### How to use
 
-1. Download the code to a folder on your computer.
-2. Edit `config.js` and update your credentials for the eufy cloud.
-3. Run `npm install` in a terminal in the location where you downloaded the code
-4. Run `node index.js` and follow the onscreen menu.
+1. Download the code via `git -clone --recursive https://github.com/thieren/eufy-test-client.git`
+2. Change into the created `eufy-test-client` folder
+3. Run `cd eufy-security-client; npm install; npm run build; cd ..; npm install`
+   This installs and builds the development dependencies and may take a while.
+4. Run `node index.js`
 
 ### Current features
 - Connect to eufy security cloud
