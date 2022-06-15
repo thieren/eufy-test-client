@@ -8,7 +8,7 @@ If you're looking for a more complete/robust/better programmed way to interact w
 
 ### How to use
 
-1. Download the code via `git -clone --recursive https://github.com/thieren/eufy-test-client.git`
+1. Download the code via `git clone --recursive https://github.com/thieren/eufy-test-client.git`
 2. Change into the created `eufy-test-client` folder
 3. Run `cd eufy-security-client; npm install; npm run build; cd ..; npm install`
    This installs and builds the development dependencies and may take a while.
