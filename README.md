@@ -22,6 +22,8 @@ If you're looking for a more complete/robust/better programmed way to interact w
 - Change guard mode on stations
 - Trigger and reset alarm
 - Start/Stop P2P Livestream on devices
+- Start/Stop Cloud livestream on devices
+- get RTSP capabilities of devices
 - Test Talkback feature on devices
 - set maximum livestream duration
 - save logfile

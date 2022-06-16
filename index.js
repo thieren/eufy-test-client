@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-const { EufySecurity } = require('eufy-security-client');
+const { EufySecurity, Device, PropertyName } = require('eufy-security-client');
 const ffmpegPath = require('ffmpeg-for-homebridge');
 
 const mp3Path = require.resolve('./sample.mp3');
@@ -247,7 +247,7 @@ class EufyPlatform {
     });
   }
 
-  saveEufyLog() {
+  async saveEufyLog() {
     console.clear();
     const filename = 'eufy-security-client_log_' + Date.now() + '.txt';
     this.log.infoAndPrint('Writing log messages to file ' + filename + '...');
@@ -263,10 +263,8 @@ class EufyPlatform {
       this.log.infoAndPrint('File could not be written. Maybe check permissions!');
     }
 
-    setTimeout(() => {
-      console.log('Returning to main menu...');
-      this.actionMainMenu();
-    }, 4000);
+    await this.waitForEnterKeystroke();
+    this.actionMainMenu();
   }
 
   async updateDevices() {
@@ -370,14 +368,14 @@ class EufyPlatform {
     });
   }
 
-  actionStationsMenu() {
+  async actionStationsMenu() {
     this.log.info('Enter stations menu.')
 
     if (this.stations.length == 0) {
-      this.log.infoAndPrint('There were no stations found! Going back...');
-      setTimeout(() => {
-        this.actionMainMenu();
-      }, 4000);
+      this.log.infoAndPrint('There were no stations found!');
+      
+      await this.waitForEnterKeystroke();
+      this.actionMainMenu();
       return;
     }
 
@@ -443,7 +441,7 @@ class EufyPlatform {
     });
   }
 
-  actionGuardModeMenu(station) {
+  async actionGuardModeMenu(station) {
     this.log.info('enter guard mode menu for station ' + this.stations[station].getName());
 
     const modes = [
@@ -524,57 +522,52 @@ class EufyPlatform {
       }
 
 
-      this.log.infoAndPrint('Command executed. Returning to main menu...');
-      setTimeout(() => {
-        this.actionMainMenu();
-      }, 5000);
-
+      this.log.infoAndPrint('Command executed.');
+      
+      await this.waitForEnterKeystroke();
+      this.actionMainMenu();
     });
   }
 
-  actionTriggerStationAlarm(station) {
+  async actionTriggerStationAlarm(station) {
     console.clear();
     this.log.info('trigger station alarm for station ' + station);
 
-    readline.question('How long (in seconds)? ', choice => {
+    readline.question('How long (in seconds)? ', async choice => {
 
       var value = this.getMenuChoice(choice);
       if (!value || value < 0) {
         this.log.infoAndPrint('No valid value!');
-        setTimeout(() => {
-          this.actionStationMenu(station);
-        }, 4000);
+        await this.waitForEnterKeystroke();
+        this.actionStationMenu(station);
         return;
       }
 
       this.log.info('alarm for ' + value + ' seconds');
       this.stations[station].triggerStationAlarmSound(value);
 
-      setTimeout(() => {
-        this.actionStationMenu(station);
-      }, 2000);
+      await this.waitForEnterKeystroke();
+      this.actionStationMenu(station);
     });
   }
 
-  actionResetStationAlarm(station) {
+  async actionResetStationAlarm(station) {
     console.clear();
     this.log.infoAndPrint('Reset station alarm for station ' + station);
 
     this.stations[station].resetStationAlarmSound();
 
-    setTimeout(() => {
-      this.actionStationMenu(station);
-    }, 4000);
+    await this.waitForEnterKeystroke();
+    this.actionStationMenu(station);
   }
 
-  actionDevicesMenu() {
+  async actionDevicesMenu() {
     this.log.info('Enter devices menu.')
 
     if (this.devices.length == 0) {
-      this.log.infoAndPrint('There were no devices found! Going back...');
-      setTimeout(() => {
-        this.actionMainMenu();
-      }, 4000);
+      this.log.infoAndPrint('There were no devices found!');
+      await this.waitForEnterKeystroke();
+      this.actionMainMenu();
       return;
     }
 
@@ -615,7 +608,10 @@ class EufyPlatform {
     console.log('2. Stop P2P Livestream');
     console.log('3. Start Talkback');
     console.log('4. Stop Talkback');
-    console.log('5. Main Menu');
+    console.log('5. Start Cloud Livestream');
+    console.log('6. Stop Cloud Livestream');
+    console.log('7. Get RTSP Capabilities');
+    console.log('8. Main Menu');
 
     readline.question('Choice?   ', choice => {
 
@@ -634,6 +630,15 @@ class EufyPlatform {
           this.actionTalkbackStop(device);
         break;
         case 5:
+          this.actionCloudLivestreamStart(device);
+        break;
+        case 6:
+          this.actionCloudLivestreamStop(device);
+        break;
+        case 7:
+          this.actionGetRTSPProperties(device);
+        break;
+        case 8:
           this.actionMainMenu();
         break;
         default:
@@ -655,9 +660,8 @@ class EufyPlatform {
       this.log.infoAndPrint('Could not start talkback: ' + err);
     }
 
-    setTimeout(() => {
-      this.actionDeviceMenu(deviceId);
-    }, 1000);
+    await this.waitForEnterKeystroke();
+    this.actionDeviceMenu(deviceId);
   }
 
   async actionLivestreamStop(deviceId) {
@@ -671,9 +675,8 @@ class EufyPlatform {
       this.log.infoAndPrint('Could not start talkback: ' + err);
     }
 
-    setTimeout(() => {
-      this.actionDeviceMenu(deviceId);
-    }, 1000);
+    await this.waitForEnterKeystroke();
+    this.actionDeviceMenu(deviceId);
   }
 
   async actionTalkbackStart(deviceId) {
@@ -687,9 +690,8 @@ class EufyPlatform {
       this.log.infoAndPrint('Could not start talkback: ' + err);
     }
 
-    setTimeout(() => {
-      this.actionDeviceMenu(deviceId);
-    }, 5000);
+    await this.waitForEnterKeystroke();
+    this.actionDeviceMenu(deviceId);
   }
 
   onStationTalkbackStart(station, device, stream) {
@@ -732,13 +734,55 @@ class EufyPlatform {
       this.log.infoAndPrint('Could not stop talkback: ' + err);
     }
 
-    setTimeout(() => {
-      this.actionDeviceMenu(deviceId);
-    }, 5000);
+    await this.waitForEnterKeystroke();
+    this.actionDeviceMenu(deviceId);
   }
 
   onStationTalkbackStop(station, device) {
     this.log.infoAndPrint('Event: Talkback stopped from ' + device.getName() + ' on station ' + station.getName());
+  }
+
+  async actionCloudLivestreamStart(deviceId) {
+    console.clear();
+    const device = this.devices[deviceId];
+    this.log.infoAndPrint('Starting cloud livestream for ' + device.getName() + '...');
+    try {
+      this.eufyClient.startCloudLivestream(device.getSerial());
+    } catch (err) {
+      this.log.error('Could not start cloud livestream: ' + err);
+      console.log('Cloud livestream did not start due to error.');
+    }
+    await this.waitForEnterKeystroke();
+    this.actionDeviceMenu(deviceId);
+  }
+
+  async actionCloudLivestreamStop(deviceId) {
+    console.clear();
+    const device = this.devices[deviceId];
+    this.log.infoAndPrint('Stopping cloud livestream for ' + device.getName() + '...');
+    try {
+      this.eufyClient.stopCloudLivestream(device.getSerial());
+    } catch (err) {
+      this.log.error('Could not stop cloud livestream: ' + err);
+      console.log('Cloud livestream did not stop due to error.');
+    }
+    await this.waitForEnterKeystroke();
+    this.actionDeviceMenu(deviceId);
+  }
+
+  async actionGetRTSPProperties(deviceId) {
+    console.clear();
+    const device = this.devices[deviceId];
+    this.log.infoAndPrint('Getting RTSP capabilities for ' + device.getName());
+    const hasProperty = (device.hasProperty('rtspStream'));
+    this.log.infoAndPrint('Device has RTSP property: ' + hasProperty);
+    const enabledProperty = (device.getPropertyValue(PropertyName.DeviceRTSPStream));
+    const url = (device.getPropertyValue(PropertyName.DeviceRTSPStreamUrl));
+    this.log.infoAndPrint('Device RTSP enabled: ' + enabledProperty);
+    this.log.infoAndPrint('Device RTSP url: ' + url);
+
+    await this.waitForEnterKeystroke();
+    this.actionDeviceMenu(deviceId);
   }
 
   actionSettingsMenu() {
@@ -772,26 +816,24 @@ class EufyPlatform {
     });
   }
 
-  actionMaxLivestreamDuration() {
+  async actionMaxLivestreamDuration() {
     this.log.info('Set maximum livestream duration');
 
     console.clear();
 
-    readline.question('Enter maximum duration for livestreams (in seconds): ', choice => {
+    readline.question('Enter maximum duration for livestreams (in seconds): ', async choice => {
       var value = this.getMenuChoice(choice);
       if(!value || value < 1) {
         this.log.infoAndPrint('No valid value entered!');
-        setTimeout(() => {
-          this.actionSettingsMenu();
-        }, 4000);
+        await this.waitForEnterKeystroke();
+        this.actionSettingsMenu();
         return;
       }
 
       this.eufyClient.setCameraMaxLivestreamDuration(value);
       this.log.infoAndPrint('Set ' + value + ' seconds as maximum livestream duration.');
-      setTimeout(() => {
-        this.actionSettingsMenu();
-      }, 4000);
+      await this.waitForEnterKeystroke();
+      this.actionSettingsMenu();
     });
   }
 
@@ -804,11 +846,18 @@ class EufyPlatform {
     return null;
   }
 
-  notImplementedYet() {
-    this.log.infoAndPrint('Not implemented yet! Going back...');
-    setTimeout(() => {
-      this.actionMainMenu();
-    }, 4000);
+  waitForEnterKeystroke() {
+    return new Promise((resolve, reject) => {
+      readline.question('', (choice) => {
+        resolve();
+      });
+    })
+  }
+
+  async notImplementedYet() {
+    this.log.infoAndPrint('Not implemented yet!');
+    await this.waitForEnterKeystroke();
+    this.actionMainMenu();
   }
 }
 
