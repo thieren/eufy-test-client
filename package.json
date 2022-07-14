@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/thieren/eufy-test-client#readme",
   "dependencies": {
+    "bunyan": "^1.8.15",
     "eufy-security-client": "file:eufy-security-client",
     "ffmpeg-for-homebridge": "^0.1.4"
   }

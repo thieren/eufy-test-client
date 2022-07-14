@@ -9,6 +9,8 @@ const { spawn } = require('child_process');
 const { EufySecurity, Device, PropertyName } = require('eufy-security-client');
 const ffmpegPath = require('ffmpeg-for-homebridge');
 
+const bunyan = require('bunyan');
+
 const mp3Path = require.resolve('./sample.mp3');
 
 const { config } = require('./config');
@@ -96,7 +98,19 @@ class EufyPlatform {
   }
 
   async connect() {
-    this.eufyClient = await EufySecurity.initialize(this.config, this.eufyLibraryLog);
+
+    const logLib = bunyan.createLogger({
+      name: 'eufy-test-client]',
+      hostname: '',
+      streams: [{
+        level: 'debug',
+        type: 'rotating-file',
+        count: 3,
+        path: 'eufy-security-client.log',
+      }],
+    });
+
+    this.eufyClient = await EufySecurity.initialize(this.config, logLib);
 
     this.connectLoginHandlers();
 
@@ -335,8 +349,7 @@ class EufyPlatform {
     console.log('2. Select Devices');
     console.log('3. Settings');
     console.log('4. Show log');
-    console.log('5. Save eufy-security-client library log');
-    console.log('6. Exit');
+    console.log('5. Exit');
 
     readline.question('Choice?   ', choice => {
 
@@ -355,9 +368,6 @@ class EufyPlatform {
           this.showLog();
         break;
         case 5:
-          this.saveEufyLog();
-        break;
-        case 6:
           this.close();
         break;
         default:
