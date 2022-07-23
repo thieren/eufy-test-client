@@ -180,6 +180,8 @@ class EufyPlatform {
     this.eufyClient.on('mqtt connect', () => this.log.info('Event: mqtt connect'));
     this.eufyClient.on('mqtt close', () => this.log.info('Event: mqtt close'));
     this.eufyClient.on('mqtt lock message', (message) => this.log.info('Event: mqtt message: ' + JSON.stringify(message)));
+    this.eufyClient.on('station alarm armed', (station) => this.log.info('Event: Station ' + station.getName() + ' alarm armed'));
+    this.eufyClient.on('station alarm arm delay event', (station, armDelay) => this.log.info('Event: Station ' + station.getName() + ' alarm delayed by ' + armDelay + ' seconds'));
   }
 
   onDeviceAdded(device) {
